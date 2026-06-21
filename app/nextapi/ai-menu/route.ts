@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'Gemini API key yapılandırılmamış' }, { status: 500 })
+    return NextResponse.json({ error: 'OpenAI API key yapılandırılmamış' }, { status: 500 })
   }
 
   const formData = await req.formData()
@@ -48,37 +48,41 @@ Kurallar:
 - Kategorisi olmayan ürünleri "Genel" / "General" kategorisine ekle
 - SADECE JSON döndür, ekstra metin ekleme`
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { inline_data: { mime_type: mimeType, data: base64Image } },
-              { text: prompt },
-            ],
-          },
-        ],
-        generationConfig: {
-          response_mime_type: 'application/json',
+  const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: 'low' },
+            },
+            { type: 'text', text: prompt },
+          ],
         },
-      }),
-    }
-  )
+      ],
+      max_tokens: 4096,
+    }),
+  })
 
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text()
-    return NextResponse.json({ error: 'Gemini API hatası', details: errText }, { status: 500 })
+  if (!openaiRes.ok) {
+    const errText = await openaiRes.text()
+    return NextResponse.json({ error: 'OpenAI API hatası', details: errText }, { status: 500 })
   }
 
-  const geminiData = await geminiRes.json()
-  const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
+  const openaiData = await openaiRes.json()
+  const content = openaiData.choices?.[0]?.message?.content
 
   if (!content) {
-    return NextResponse.json({ error: 'Gemini yanıt vermedi' }, { status: 500 })
+    return NextResponse.json({ error: 'OpenAI yanıt vermedi' }, { status: 500 })
   }
 
   try {
