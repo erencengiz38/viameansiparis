@@ -110,9 +110,16 @@ export default function SettingsPage({
         <input
           type="tel"
           value={form.phone}
-          onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+            let formatted = digits
+            if (digits.length > 6) formatted = digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6, 8) + (digits.length > 8 ? ' ' + digits.slice(8, 10) : '')
+            else if (digits.length > 3) formatted = digits.slice(0, 3) + ' ' + digits.slice(3)
+            setForm(f => ({ ...f, phone: formatted }))
+          }}
           className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-colors"
-          placeholder="05XX XXX XX XX"
+          placeholder="555 555 55 55"
+          maxLength={12}
         />
       </FieldGroup>
 
