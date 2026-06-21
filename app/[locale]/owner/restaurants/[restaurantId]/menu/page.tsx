@@ -8,7 +8,7 @@ import { getErrorMessage, formatPrice } from '@/lib/utils'
 import { Card, CardBody, Modal, EmptyState, Spinner, Badge } from '@/components/ui/index'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, Pencil, Trash2, Eye, EyeOff, UtensilsCrossed, X, Tag, ChevronRight, ChevronUp, ChevronDown, Sparkles } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, UtensilsCrossed, X, Tag, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { useForm, useFieldArray } from 'react-hook-form'
 import type { MenuItem, Category } from '@/types'
@@ -37,19 +37,6 @@ interface MenuItemForm {
 
 type Tab = 'categories' | 'items'
 
-interface AiMenuResult {
-  categories: {
-    name: string
-    nameEn: string
-    items: {
-      name: string
-      nameEn?: string
-      description?: string
-      descriptionEn?: string
-      price: number
-    }[]
-  }[]
-}
 
 export default function MenuPage({ params }: { params: Promise<{ restaurantId: string; locale: string }> }) {
   const { restaurantId, locale } = use(params)
@@ -63,12 +50,6 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [editCat, setEditCat] = useState<Category | null>(null)
 
-  const [aiModalOpen, setAiModalOpen] = useState(false)
-  const [aiDescription, setAiDescription] = useState('')
-  const [aiImageFile, setAiImageFile] = useState<File | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiResult, setAiResult] = useState<AiMenuResult | null>(null)
-  const [aiCreating, setAiCreating] = useState(false)
 
   const { data: items = [], isLoading: itemsLoading } = useQuery({
     queryKey: ['menu-items', rId],
@@ -216,85 +197,6 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
-  // AI menü oluşturma
-  const handleAiSubmit = async () => {
-    if (!aiImageFile) return
-    setAiLoading(true)
-    try {
-      const fd = new FormData()
-      fd.append('image', aiImageFile)
-      fd.append('description', aiDescription)
-      const res = await fetch('/nextapi/ai-menu', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Hata oluştu')
-      setAiResult(data)
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'AI hatası')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  const fetchPexelsImage = async (query: string): Promise<string | undefined> => {
-    try {
-      const res = await fetch(`/nextapi/pexels?q=${encodeURIComponent(query + ' food')}`)
-      const data = await res.json()
-      return data.photos?.[0]?.url
-    } catch {
-      return undefined
-    }
-  }
-
-  const handleAiCreate = async () => {
-    if (!aiResult) return
-    setAiCreating(true)
-    try {
-      const catMap: Record<string, number> = {}
-      for (const cat of aiResult.categories) {
-        const existing = categories.find(c => c.name.toLowerCase() === cat.name.toLowerCase())
-        if (existing) {
-          catMap[cat.name] = existing.id
-        } else {
-          const imageUrl = await fetchPexelsImage(cat.nameEn || cat.name)
-          const created = await ownerApi.createCategory(rId, {
-            name: cat.name,
-            nameEn: cat.nameEn,
-            imageUrl,
-            displayOrder: categories.length,
-          })
-          catMap[cat.name] = created.id
-        }
-      }
-      for (const cat of aiResult.categories) {
-        for (const item of cat.items) {
-          const imageUrl = await fetchPexelsImage(item.nameEn || item.name)
-          await ownerApi.createMenuItem(rId, {
-            name: item.name,
-            nameEn: item.nameEn,
-            description: item.description,
-            descriptionEn: item.descriptionEn,
-            basePrice: item.price,
-            imageUrl,
-            categoryId: catMap[cat.name] ?? null,
-            available: true,
-            displayOrder: 0,
-            optionGroups: [],
-          })
-        }
-      }
-      await qc.invalidateQueries({ queryKey: ['categories', rId] })
-      await qc.invalidateQueries({ queryKey: ['menu-items', rId] })
-      toast.success('Menü başarıyla oluşturuldu!')
-      setAiModalOpen(false)
-      setAiResult(null)
-      setAiImageFile(null)
-      setAiDescription('')
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Oluşturma hatası')
-    } finally {
-      setAiCreating(false)
-    }
-  }
 
   // Kategoriye göre grupla
   const grouped = categories.reduce((acc, cat) => {
@@ -305,9 +207,8 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
 
   return (
     <div className="space-y-4">
-      {/* Tab bar + AI button */}
-      <div className="flex gap-2 items-center">
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl flex-1">
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl">
         <button
           onClick={() => setTab('categories')}
           className={cn(
@@ -338,15 +239,6 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
             </span>
           )}
         </button>
-      </div>
-      <button
-        onClick={() => { setAiResult(null); setAiModalOpen(true) }}
-        className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors flex-shrink-0"
-        title="AI ile menü oluştur"
-      >
-        <Sparkles className="h-4 w-4" />
-        AI
-      </button>
       </div>
 
       {/* ═══ KATEGORİLER ═══════════════════════════════════ */}
@@ -558,91 +450,6 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
             </Button>
           </div>
         </form>
-      </Modal>
-
-      {/* ─── AI Modal ─── */}
-      <Modal
-        open={aiModalOpen}
-        onClose={() => { setAiModalOpen(false); setAiResult(null) }}
-        title="AI ile Menü Oluştur"
-      >
-        {!aiResult ? (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">Menü resmini yükleyin. AI otomatik olarak ürünleri, kategorileri ve açıklamaları (TR + EN) oluşturacak.</p>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Menü Resmi</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => setAiImageFile(e.target.files?.[0] ?? null)}
-                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-violet-50 file:text-violet-700 file:font-semibold hover:file:bg-violet-100 transition-colors"
-              />
-              {aiImageFile && <p className="text-xs text-gray-400 mt-1">{aiImageFile.name}</p>}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Ek Açıklama (opsiyonel)</label>
-              <textarea
-                value={aiDescription}
-                onChange={e => setAiDescription(e.target.value)}
-                rows={3}
-                placeholder="AI'a ek bilgi verin: mutfak türü, fiyat formatı, vb."
-                className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-colors resize-none"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" fullWidth type="button" onClick={() => setAiModalOpen(false)}>İptal</Button>
-              <Button
-                fullWidth
-                type="button"
-                loading={aiLoading}
-                disabled={!aiImageFile || aiLoading}
-                onClick={handleAiSubmit}
-                className="bg-violet-600 hover:bg-violet-700"
-              >
-                <Sparkles className="h-4 w-4" />
-                Analiz Et
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-violet-50 rounded-xl p-3">
-              <p className="text-sm font-semibold text-violet-900">{aiResult.categories.reduce((s, c) => s + c.items.length, 0)} ürün bulundu — {aiResult.categories.length} kategori</p>
-              <p className="text-xs text-violet-600 mt-0.5">Onayladığınızda bunlar menüye eklenecek</p>
-            </div>
-            <div className="max-h-64 overflow-y-auto space-y-3">
-              {aiResult.categories.map((cat, ci) => (
-                <div key={ci}>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{cat.name} {cat.nameEn ? `/ ${cat.nameEn}` : ''}</p>
-                  <div className="space-y-1">
-                    {cat.items.map((item, ii) => (
-                      <div key={ii} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
-                          {item.nameEn && <p className="text-xs text-gray-400 truncate">{item.nameEn}</p>}
-                        </div>
-                        <span className="text-sm font-bold text-gray-700 ml-3 flex-shrink-0">{item.price > 0 ? `₺${item.price}` : '—'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" fullWidth type="button" onClick={() => setAiResult(null)}>Geri</Button>
-              <Button
-                fullWidth
-                type="button"
-                loading={aiCreating}
-                onClick={handleAiCreate}
-                className="bg-violet-600 hover:bg-violet-700"
-              >
-                <Sparkles className="h-4 w-4" />
-                Menüye Ekle
-              </Button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       {/* ─── Ürün Modal ─── */}

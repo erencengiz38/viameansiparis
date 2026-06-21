@@ -8,7 +8,7 @@ import { getErrorMessage, formatPrice } from '@/lib/utils'
 import { Card, CardBody, Modal, EmptyState, Spinner } from '@/components/ui/index'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, QrCode, RefreshCw, Trash2, Pencil, Check, X, Printer, Lock, LockOpen, Shield, ShieldOff } from 'lucide-react'
+import { Plus, QrCode, RefreshCw, Trash2, Pencil, Check, X, Printer, Lock, LockOpen, Shield, ShieldOff, FileDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { QRCodeCanvas } from 'qrcode.react'
 import { cn } from '@/lib/utils'
@@ -369,6 +369,24 @@ export default function TablesPage({ params }: { params: Promise<{ restaurantId:
     setTimeout(() => win.print(), 400)
   }, [tables, selected, restaurantName, showTableNumber])
 
+  // ── PDF export (all tables) ──
+  const exportAllPdf = useCallback(() => {
+    if (tables.length === 0) return
+    const qrImages: Record<number, string> = {}
+    tables.forEach(tb => {
+      const canvas = document.getElementById(`qr-hidden-${tb.id}`) as HTMLCanvasElement | null
+      if (canvas) qrImages[tb.id] = canvas.toDataURL('image/png')
+    })
+    const logoUrl = `${window.location.origin}/dark-logo.png`
+    const html = buildPrintHtml(tables, qrImages, restaurantName, showTableNumber, logoUrl)
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) { toast.error('Popup engelleyici PDF açılmasını önledi.'); return }
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 400)
+  }, [tables, restaurantName, showTableNumber])
+
   // ── QR download (single) ──
   const downloadQr = (tableNumber: number, tableId: number) => {
     const canvas = document.getElementById(`qr-hidden-${tableId}`) as HTMLCanvasElement | null
@@ -458,6 +476,12 @@ export default function TablesPage({ params }: { params: Promise<{ restaurantId:
             <>
               <h3 className="font-bold text-gray-900">Masalar</h3>
               <div className="flex gap-2">
+                {tables.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={exportAllPdf}>
+                    <FileDown className="h-4 w-4" />
+                    PDF İndir
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
                   <Plus className="h-4 w-4" />
                   Toplu Oluştur
