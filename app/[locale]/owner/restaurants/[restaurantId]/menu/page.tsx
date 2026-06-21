@@ -224,7 +224,7 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
       const fd = new FormData()
       fd.append('image', aiImageFile)
       fd.append('description', aiDescription)
-      const res = await fetch('/api/ai-menu', { method: 'POST', body: fd })
+      const res = await fetch('/nextapi/ai-menu', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Hata oluştu')
       setAiResult(data)
@@ -237,7 +237,7 @@ export default function MenuPage({ params }: { params: Promise<{ restaurantId: s
 
   const fetchPexelsImage = async (query: string): Promise<string | undefined> => {
     try {
-      const res = await fetch(`/api/pexels?q=${encodeURIComponent(query + ' food')}`)
+      const res = await fetch(`/nextapi/pexels?q=${encodeURIComponent(query + ' food')}`)
       const data = await res.json()
       return data.photos?.[0]?.url
     } catch {

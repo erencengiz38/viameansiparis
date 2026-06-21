@@ -54,7 +54,7 @@ export function ImageUpload({ restaurantId, value, onChange, context = 'item', l
     setSearching(true)
     setPhotos([])
     try {
-      const res = await fetch(`/api/pexels?q=${encodeURIComponent(query)}`)
+      const res = await fetch(`/nextapi/pexels?q=${encodeURIComponent(query)}`)
       const data = await res.json()
       setPhotos(data.photos ?? [])
     } catch {
